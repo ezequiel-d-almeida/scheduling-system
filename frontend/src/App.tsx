@@ -9,24 +9,22 @@ import {
 import { SchedulingProvider } from "./context/SchedulingContext";
 
 import AdminLayout from "./layouts/AdminLayout";
+import PublicLayout from "./layouts/PublicLayout";
 import RequestsPage from "./pages/RequestsPage";
 import AgendaPage from "./pages/AgendaPage";
 import SettingsPage from "./pages/SettingsPage";
+import HomePage from "./pages/HomePage";
+import BookingPage from "./pages/BookingPage";
 
 export default function App() {
   return (
     <SchedulingProvider>
       <BrowserRouter>
         <Routes>
-          <Route
-            path="/"
-            element={
-              <Navigate
-                to="/admin/solicitacoes"
-                replace
-              />
-            }
-          />
+          <Route path="/" element={<PublicLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="agendar" element={<BookingPage />} />
+          </Route>
 
           <Route
             path="/admin"
@@ -61,10 +59,7 @@ export default function App() {
           <Route
             path="*"
             element={
-              <Navigate
-                to="/admin/solicitacoes"
-                replace
-              />
+              <Navigate to="/" replace />
             }
           />
         </Routes>

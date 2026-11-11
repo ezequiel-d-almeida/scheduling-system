@@ -27,6 +27,9 @@ type SchedulingContextType = {
   updateAvailability: (
     settings: AvailabilitySettings
   ) => void;
+  requestAppointment: (
+    appointment: Omit<Appointment, "id" | "status">
+  ) => void;
 };
 
 const SchedulingContext = createContext<
@@ -71,6 +74,19 @@ export function SchedulingProvider({
     setAvailability(settings);
   }
 
+  function requestAppointment(
+    appointment: Omit<Appointment, "id" | "status">
+  ) {
+    setAppointments((previous) => [
+      ...previous,
+      {
+        ...appointment,
+        id: Math.max(0, ...previous.map((item) => item.id)) + 1,
+        status: "PENDING",
+      },
+    ]);
+  }
+
   return (
     <SchedulingContext.Provider
       value={{
@@ -78,6 +94,7 @@ export function SchedulingProvider({
         availability,
         updateAppointmentStatus,
         updateAvailability,
+        requestAppointment,
       }}
     >
       {children}
