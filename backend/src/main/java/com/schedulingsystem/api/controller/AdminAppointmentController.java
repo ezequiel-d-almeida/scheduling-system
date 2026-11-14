@@ -4,13 +4,10 @@ import com.schedulingsystem.api.dto.*;
 import com.schedulingsystem.api.entity.AppointmentStatus;
 import com.schedulingsystem.api.service.AppointmentService;
 import jakarta.validation.Valid;
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
-/** Development-only until authentication is delivered. */
-@Profile("dev")
 @RestController
 @RequestMapping("/api/admin/appointments")
 public class AdminAppointmentController {

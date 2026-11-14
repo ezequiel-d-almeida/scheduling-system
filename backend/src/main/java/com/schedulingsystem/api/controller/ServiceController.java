@@ -11,13 +11,11 @@ import com.schedulingsystem.api.dto.ServiceResponse;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 import com.schedulingsystem.api.dto.UpdateServiceStatusRequest;
 
 @RestController
-@Profile("dev")
 @RequestMapping("/api/services")
 public class ServiceController {
 
