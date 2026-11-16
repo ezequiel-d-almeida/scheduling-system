@@ -13,8 +13,8 @@ export default function PublicLayout() {
     <div className="public-shell">
       <header className="public-header">
         <Link className="public-brand" to="/" onClick={closeMenu}>
-          <span className="public-brand-name">Clínica de Psicanálise</span>
-          <span>um espaço de escuta</span>
+          <span className="public-brand-name">Débora Rodrigues</span>
+          <span>Psicanalista Clínica</span>
         </Link>
 
         <button

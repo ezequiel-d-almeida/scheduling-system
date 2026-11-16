@@ -22,7 +22,10 @@ export default function BookingPage() {
   useEffect(() => { void (async () => { try { setServices(await publicApi.services()); } catch { setError("Não foi possível carregar as opções de atendimento."); } finally { setLoadingServices(false); } })(); }, []);
   async function chooseDate(nextDate: string) {
     if (!serviceId) return; setDate(nextDate); setStartsAt(""); setAvailableStarts([]); setLoadingSlots(true); setError("");
-    try { setAvailableStarts((await publicApi.availability(nextDate, serviceId)).availableStarts); } catch { setError("Não foi possível consultar os horários desta data."); } finally { setLoadingSlots(false); }
+    try {
+      const availability = await publicApi.availability(nextDate, serviceId);
+      setAvailableStarts([...new Set(availability.availableStarts)]);
+    } catch { setError("Não foi possível consultar os horários desta data."); } finally { setLoadingSlots(false); }
   }
   async function submitRequest() {
     if (isSubmitting || !serviceId || !modality || !startsAt) return;

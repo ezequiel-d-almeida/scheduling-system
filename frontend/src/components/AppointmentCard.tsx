@@ -4,6 +4,8 @@ import { CalendarDays, Check, Clock3, Phone, RotateCcw, X } from "lucide-react";
 import type { Appointment } from "../types/scheduling";
 import type { AppointmentEventResponse } from "../types/api";
 
+const toRecifeOffsetDateTime = (value: string) => `${value}${value.length === 16 ? ":00" : ""}-03:00`;
+
 type Props = {
   appointment: Appointment;
   onConfirm: (id: number) => Promise<void>;
@@ -54,8 +56,8 @@ export default function AppointmentCard({
   async function submitReschedule() {
     if (!newDateTime) return;
     setBusy(true); setError("");
-    try { await onReschedule(appointment.id, new Date(newDateTime).toISOString()); setRescheduling(false); setNewDateTime(""); }
-    catch { setError("Não foi possível remarcar. Verifique a disponibilidade."); }
+    try { await onReschedule(appointment.id, toRecifeOffsetDateTime(newDateTime)); setRescheduling(false); setNewDateTime(""); }
+    catch (exception) { setError(exception instanceof Error ? exception.message : "Não foi possível remarcar. Verifique a disponibilidade."); }
     finally { setBusy(false); }
   }
 
@@ -139,7 +141,18 @@ export default function AppointmentCard({
           <button className="btn btn-secondary" onClick={() => void loadHistory()}>Histórico</button>
         </div>
       )}
-      {rescheduling && <div className="confirmation-panel"><label>Nova data e horário<input type="datetime-local" value={newDateTime} onChange={(event) => setNewDateTime(event.target.value)} /></label><div className="card-actions"><button className="btn btn-secondary" onClick={() => setRescheduling(false)}>Voltar</button><button className="btn btn-primary" disabled={!newDateTime || busy} onClick={() => void submitReschedule()}>{busy ? "Remarcando..." : "Confirmar remarcação"}</button></div></div>}
+      {rescheduling && <section className="reschedule-panel" aria-label="Remarcar agendamento">
+        <div className="reschedule-summary">
+          <p className="reschedule-eyebrow">Remarcação</p>
+          <h4>Escolha um novo horário</h4>
+          <p>Reserva atual: {formattedDate}, às {appointment.time}.</p>
+        </div>
+        <label className="reschedule-field" htmlFor={`reschedule-${appointment.id}`}>
+          Nova data e horário
+          <input id={`reschedule-${appointment.id}`} type="datetime-local" value={newDateTime} onChange={(event) => setNewDateTime(event.target.value)} />
+        </label>
+        <div className="card-actions reschedule-actions"><button className="btn btn-secondary" onClick={() => setRescheduling(false)}>Voltar</button><button className="btn btn-primary" disabled={!newDateTime || busy} onClick={() => void submitReschedule()}>{busy ? "Remarcando..." : "Confirmar remarcação"}</button></div>
+      </section>}
       {history && <div className="confirmation-panel"><p>Histórico</p><ul>{history.map((event) => <li key={`${event.eventType}-${event.occurredAt}`}>{event.eventType} — {new Date(event.occurredAt).toLocaleString("pt-BR")}</li>)}</ul></div>}
       {error && <p className="field-error" role="alert">{error}</p>}
     </article>

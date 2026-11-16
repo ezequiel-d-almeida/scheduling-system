@@ -29,9 +29,12 @@ export function SchedulingProvider({ children }: { children: ReactNode }) {
   const updateAppointmentStatus = async (id: number, status: AppointmentStatus) => { const response = status === "CONFIRMED" ? await adminApi.confirm(id) : await adminApi.cancel(id); setAppointments((current) => current.map((item) => item.id === id ? toUiAppointment(response) : item)); };
   const rescheduleAppointment = async (id: number, startsAt: string) => { const response = await adminApi.reschedule(id, startsAt); setAppointments((current) => current.map((item) => item.id === id ? toUiAppointment(response) : item)); };
   const value = useMemo<SchedulingContextType>(() => ({ appointments, services, windows, blocks, loading, error, refreshAdminData, updateAppointmentStatus, rescheduleAppointment, appointmentHistory: adminApi.history,
-    createService: async (name, duration) => { await adminApi.createService(name, duration); await refreshAdminData(); }, setServiceActive: async (id, active) => { await adminApi.updateServiceStatus(id, active); await refreshAdminData(); },
-    addWindow: async (day, start, end) => { await adminApi.addWindow(day, start, end); await refreshAdminData(); }, removeWindow: async (id) => { await adminApi.removeWindow(id); await refreshAdminData(); },
-    addBlock: async (startsAt, endsAt, reason) => { await adminApi.addBlock(startsAt, endsAt, reason); await refreshAdminData(); }, removeBlock: async (id) => { await adminApi.removeBlock(id); await refreshAdminData(); },
+    createService: async (name, duration) => { const response = await adminApi.createService(name, duration); setServices((current) => [...current.filter((service) => service.id !== response.id), response]); },
+    setServiceActive: async (id, active) => { const response = await adminApi.updateServiceStatus(id, active); setServices((current) => current.map((service) => service.id === id ? response : service)); },
+    addWindow: async (day, start, end) => { const response = await adminApi.addWindow(day, start, end); setWindows((current) => [...current.filter((window) => window.id !== response.id), response]); },
+    removeWindow: async (id) => { await adminApi.removeWindow(id); setWindows((current) => current.filter((window) => window.id !== id)); },
+    addBlock: async (startsAt, endsAt, reason) => { const response = await adminApi.addBlock(startsAt, endsAt, reason); setBlocks((current) => [...current.filter((block) => block.id !== response.id), response]); },
+    removeBlock: async (id) => { await adminApi.removeBlock(id); setBlocks((current) => current.filter((block) => block.id !== id)); },
   }), [appointments, services, windows, blocks, loading, error]);
   return <SchedulingContext.Provider value={value}>{children}</SchedulingContext.Provider>;
 }
