@@ -1,22 +1,32 @@
 
 import { useState } from "react";
-import { CalendarDays, Check, Clock3, Phone, X } from "lucide-react";
+import { CalendarDays, Check, Clock3, Phone, RotateCcw, X } from "lucide-react";
 import type { Appointment } from "../types/scheduling";
+import type { AppointmentEventResponse } from "../types/api";
 
 type Props = {
   appointment: Appointment;
-  onConfirm: (id: number) => void;
-  onCancel: (id: number) => void;
+  onConfirm: (id: number) => Promise<void>;
+  onCancel: (id: number) => Promise<void>;
+  onReschedule: (id: number, startsAt: string) => Promise<void>;
+  onHistory: (id: number) => Promise<AppointmentEventResponse[]>;
 };
 
 export default function AppointmentCard({
   appointment,
   onConfirm,
   onCancel,
+  onReschedule,
+  onHistory,
 }: Props) {
   const [action, setAction] = useState<
     "confirm" | "cancel" | null
   >(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [rescheduling, setRescheduling] = useState(false);
+  const [newDateTime, setNewDateTime] = useState("");
+  const [history, setHistory] = useState<AppointmentEventResponse[] | null>(null);
 
   const formattedDate = new Date(
     `${appointment.date}T12:00:00`
@@ -26,17 +36,30 @@ export default function AppointmentCard({
     year: "numeric",
   });
 
-  function executeAction() {
+  async function executeAction() {
+    setBusy(true); setError("");
+    try {
     if (action === "confirm") {
-      onConfirm(appointment.id);
+      await onConfirm(appointment.id);
     }
 
     if (action === "cancel") {
-      onCancel(appointment.id);
+      await onCancel(appointment.id);
     }
-
+    } catch { setError("Não foi possível atualizar a solicitação."); }
+    finally { setBusy(false); }
     setAction(null);
   }
+
+  async function submitReschedule() {
+    if (!newDateTime) return;
+    setBusy(true); setError("");
+    try { await onReschedule(appointment.id, new Date(newDateTime).toISOString()); setRescheduling(false); setNewDateTime(""); }
+    catch { setError("Não foi possível remarcar. Verifique a disponibilidade."); }
+    finally { setBusy(false); }
+  }
+
+  async function loadHistory() { try { setHistory(await onHistory(appointment.id)); } catch { setError("Não foi possível carregar o histórico."); } }
 
   return (
     <article className="appointment-card">
@@ -81,16 +104,17 @@ export default function AppointmentCard({
                   ? "btn btn-primary"
                   : "btn btn-danger"
               }
-              onClick={executeAction}
+              onClick={() => void executeAction()}
+              disabled={busy}
             >
               {action === "confirm" ? (
                 <Check aria-hidden="true" size={18} strokeWidth={1.8} />
               ) : (
                 <X aria-hidden="true" size={18} strokeWidth={1.8} />
               )}
-              Sim, {action === "confirm"
+              {busy ? "Atualizando..." : <>Sim, {action === "confirm"
                 ? "confirmar"
-                : "cancelar"}
+                : "cancelar"}</>}
             </button>
           </div>
         </div>
@@ -111,8 +135,13 @@ export default function AppointmentCard({
               <Check aria-hidden="true" size={18} strokeWidth={1.8} />
               Confirmar
           </button>
+          <button className="btn btn-secondary" onClick={() => setRescheduling((value) => !value)}><RotateCcw aria-hidden="true" size={18} strokeWidth={1.8} />Remarcar</button>
+          <button className="btn btn-secondary" onClick={() => void loadHistory()}>Histórico</button>
         </div>
       )}
+      {rescheduling && <div className="confirmation-panel"><label>Nova data e horário<input type="datetime-local" value={newDateTime} onChange={(event) => setNewDateTime(event.target.value)} /></label><div className="card-actions"><button className="btn btn-secondary" onClick={() => setRescheduling(false)}>Voltar</button><button className="btn btn-primary" disabled={!newDateTime || busy} onClick={() => void submitReschedule()}>{busy ? "Remarcando..." : "Confirmar remarcação"}</button></div></div>}
+      {history && <div className="confirmation-panel"><p>Histórico</p><ul>{history.map((event) => <li key={`${event.eventType}-${event.occurredAt}`}>{event.eventType} — {new Date(event.occurredAt).toLocaleString("pt-BR")}</li>)}</ul></div>}
+      {error && <p className="field-error" role="alert">{error}</p>}
     </article>
   );
 }

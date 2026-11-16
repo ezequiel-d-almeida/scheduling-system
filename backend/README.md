@@ -66,3 +66,9 @@ As janelas de atendimento não são preenchidas automaticamente. Configure-as an
 `mvnw.cmd test` usa Testcontainers com PostgreSQL 16 isolado; não usa `DB_URL`, credenciais do banco local ou `flyway clean`. Docker Desktop deve estar disponível. A suíte cobre migrations, conflitos, cancelamento, confirmação, remarcação, concorrência, login, CSRF, sessão, logout, hash BCrypt e proteção das rotas administrativas.
 
 Para Docker Engine 29, o Surefire força a API Docker `1.44`, evitando uma negociação legada incompatível com o Npipe do Docker Desktop.
+
+## Desenvolvimento com o frontend React
+
+Inicie a API em `http://localhost:8080` e o Vite em `frontend` com `npm run dev`. O proxy do Vite encaminha `/api` para a API, preservando uma origem única no navegador e evitando CORS durante o desenvolvimento. Como o ambiente local usa HTTP, inicie o backend com `APP_SESSION_COOKIE_SECURE=false`; mantenha o padrão seguro (`true`) em produção.
+
+O painel em `/admin` encaminha para `/admin/login` sem sessão. O frontend não guarda senha, token CSRF ou cookie de sessão em `localStorage`; ele usa o cookie HttpOnly emitido pelo backend e busca um token CSRF novo antes de cada alteração administrativa.

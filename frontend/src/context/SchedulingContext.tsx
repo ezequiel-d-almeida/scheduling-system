@@ -1,115 +1,38 @@
-
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-} from "react";
-
-import {
-  initialAvailability,
-  mockAppointments,
-} from "../data/mockAppointments";
-
-import type {
-  Appointment,
-  AppointmentStatus,
-  AvailabilitySettings,
-} from "../types/scheduling";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { adminApi } from "../services/api";
+import type { AppointmentEventResponse, AvailabilityWindow, ScheduleBlock, ServiceResponse } from "../types/api";
+import type { Appointment, AppointmentStatus } from "../types/scheduling";
 
 type SchedulingContextType = {
-  appointments: Appointment[];
-  availability: AvailabilitySettings;
-  updateAppointmentStatus: (
-    id: number,
-    status: AppointmentStatus
-  ) => void;
-  updateAvailability: (
-    settings: AvailabilitySettings
-  ) => void;
-  requestAppointment: (
-    appointment: Omit<Appointment, "id" | "status">
-  ) => void;
+  appointments: Appointment[]; services: ServiceResponse[]; windows: AvailabilityWindow[]; blocks: ScheduleBlock[];
+  loading: boolean; error: string; refreshAdminData: () => Promise<void>;
+  updateAppointmentStatus: (id: number, status: AppointmentStatus) => Promise<void>;
+  rescheduleAppointment: (id: number, startsAt: string) => Promise<void>;
+  appointmentHistory: (id: number) => Promise<AppointmentEventResponse[]>;
+  createService: (name: string, durationMinutes: number) => Promise<void>;
+  setServiceActive: (id: number, active: boolean) => Promise<void>;
+  addWindow: (day: number, start: string, end: string) => Promise<void>; removeWindow: (id: number) => Promise<void>;
+  addBlock: (startsAt: string, endsAt: string, reason: string) => Promise<void>; removeBlock: (id: number) => Promise<void>;
 };
+const SchedulingContext = createContext<SchedulingContextType | undefined>(undefined);
 
-const SchedulingContext = createContext<
-  SchedulingContextType | undefined
->(undefined);
-
-export function SchedulingProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const [appointments, setAppointments] =
-    useState<Appointment[]>(mockAppointments);
-
-  const [availability, setAvailability] =
-    useState<AvailabilitySettings>(initialAvailability);
-
-  function updateAppointmentStatus(
-    id: number,
-    status: AppointmentStatus
-  ) {
-    if (
-      status !== "CONFIRMED" &&
-      status !== "CANCELLED"
-    ) {
-      return;
-    }
-
-    setAppointments((previous) =>
-      previous.map((appointment) =>
-        appointment.id === id &&
-        appointment.status === "PENDING"
-          ? { ...appointment, status }
-          : appointment
-      )
-    );
-  }
-
-  function updateAvailability(
-    settings: AvailabilitySettings
-  ) {
-    setAvailability(settings);
-  }
-
-  function requestAppointment(
-    appointment: Omit<Appointment, "id" | "status">
-  ) {
-    setAppointments((previous) => [
-      ...previous,
-      {
-        ...appointment,
-        id: Math.max(0, ...previous.map((item) => item.id)) + 1,
-        status: "PENDING",
-      },
-    ]);
-  }
-
-  return (
-    <SchedulingContext.Provider
-      value={{
-        appointments,
-        availability,
-        updateAppointmentStatus,
-        updateAvailability,
-        requestAppointment,
-      }}
-    >
-      {children}
-    </SchedulingContext.Provider>
-  );
+function datePart(value: string) { return value.slice(0, 10); }
+function timePart(value: string) { return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value)); }
+function toUiAppointment(item: import("../types/api").AppointmentResponse): Appointment {
+  return { id: item.id, patientName: item.clientName, phone: item.clientPhone, date: datePart(item.startsAt), time: timePart(item.startsAt), modality: item.modality === "REMOTE" ? "Atendimento remoto" : "Atendimento presencial", status: item.status, serviceName: item.serviceName, startsAt: item.startsAt };
 }
 
-export function useScheduling() {
-  const context = useContext(SchedulingContext);
-
-  if (!context) {
-    throw new Error(
-      "useScheduling precisa estar dentro de SchedulingProvider"
-    );
-  }
-
-  return context;
+export function SchedulingProvider({ children }: { children: ReactNode }) {
+  const [appointments, setAppointments] = useState<Appointment[]>([]); const [services, setServices] = useState<ServiceResponse[]>([]); const [windows, setWindows] = useState<AvailabilityWindow[]>([]); const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
+  const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const refreshAdminData = async () => { setLoading(true); setError(""); try { const [rawAppointments, nextServices, nextWindows, nextBlocks] = await Promise.all([adminApi.appointments(), adminApi.services(), adminApi.windows(), adminApi.blocks()]); setAppointments(rawAppointments.map(toUiAppointment)); setServices(nextServices); setWindows(nextWindows); setBlocks(nextBlocks); } catch { setError("Não foi possível carregar os dados administrativos."); } finally { setLoading(false); } };
+  const updateAppointmentStatus = async (id: number, status: AppointmentStatus) => { const response = status === "CONFIRMED" ? await adminApi.confirm(id) : await adminApi.cancel(id); setAppointments((current) => current.map((item) => item.id === id ? toUiAppointment(response) : item)); };
+  const rescheduleAppointment = async (id: number, startsAt: string) => { const response = await adminApi.reschedule(id, startsAt); setAppointments((current) => current.map((item) => item.id === id ? toUiAppointment(response) : item)); };
+  const value = useMemo<SchedulingContextType>(() => ({ appointments, services, windows, blocks, loading, error, refreshAdminData, updateAppointmentStatus, rescheduleAppointment, appointmentHistory: adminApi.history,
+    createService: async (name, duration) => { await adminApi.createService(name, duration); await refreshAdminData(); }, setServiceActive: async (id, active) => { await adminApi.updateServiceStatus(id, active); await refreshAdminData(); },
+    addWindow: async (day, start, end) => { await adminApi.addWindow(day, start, end); await refreshAdminData(); }, removeWindow: async (id) => { await adminApi.removeWindow(id); await refreshAdminData(); },
+    addBlock: async (startsAt, endsAt, reason) => { await adminApi.addBlock(startsAt, endsAt, reason); await refreshAdminData(); }, removeBlock: async (id) => { await adminApi.removeBlock(id); await refreshAdminData(); },
+  }), [appointments, services, windows, blocks, loading, error]);
+  return <SchedulingContext.Provider value={value}>{children}</SchedulingContext.Provider>;
 }
+export function useScheduling() { const context = useContext(SchedulingContext); if (!context) throw new Error("useScheduling precisa estar dentro de SchedulingProvider"); return context; }

@@ -6,6 +6,10 @@ export default function RequestsPage() {
   const {
     appointments,
     updateAppointmentStatus,
+    rescheduleAppointment,
+    appointmentHistory,
+    loading,
+    error,
   } = useScheduling();
 
   const pendingAppointments = appointments
@@ -32,6 +36,8 @@ export default function RequestsPage() {
       </header>
 
       <div className="appointments-list">
+        {loading && <p className="muted">Carregando solicitações...</p>}
+        {error && <p className="field-error" role="alert">{error}</p>}
         {pendingAppointments.length === 0 ? (
           <div className="empty-state">
             <h3>Tudo em dia!</h3>
@@ -56,6 +62,8 @@ export default function RequestsPage() {
                   "CANCELLED"
                 )
               }
+              onReschedule={rescheduleAppointment}
+              onHistory={appointmentHistory}
             />
           ))
         )}

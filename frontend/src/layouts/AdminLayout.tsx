@@ -1,9 +1,17 @@
 
-import { Outlet } from "react-router-dom";
-import { HeartHandshake } from "lucide-react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { HeartHandshake, LogOut } from "lucide-react";
+import { useEffect } from "react";
 import BottomNavigation from "../components/BottomNavigation";
+import { useAuth } from "../context/AuthContext";
+import { useScheduling } from "../context/SchedulingContext";
 
 export default function AdminLayout() {
+  const { username, logout } = useAuth();
+  const { refreshAdminData } = useScheduling();
+  const navigate = useNavigate();
+  useEffect(() => { void refreshAdminData(); }, []);
+  async function handleLogout() { await logout(); navigate("/admin/login", { replace: true }); }
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -18,9 +26,8 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        <div className="profile-avatar">
-          A
-        </div>
+        <div className="profile-avatar" title={username ?? "Administradora"}>{username?.slice(0, 1).toUpperCase() ?? "A"}</div>
+        <button className="icon-button" type="button" onClick={() => void handleLogout()} aria-label="Encerrar sessão"><LogOut aria-hidden="true" size={20} strokeWidth={1.8} /></button>
       </header>
 
       <div className="app-body">

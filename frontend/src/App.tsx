@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 
 import { SchedulingProvider } from "./context/SchedulingContext";
+import { AuthProvider } from "./context/AuthContext";
 
 import AdminLayout from "./layouts/AdminLayout";
 import PublicLayout from "./layouts/PublicLayout";
@@ -15,9 +16,12 @@ import AgendaPage from "./pages/AgendaPage";
 import SettingsPage from "./pages/SettingsPage";
 import HomePage from "./pages/HomePage";
 import BookingPage from "./pages/BookingPage";
+import LoginPage from "./pages/LoginPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
+    <AuthProvider>
     <SchedulingProvider>
       <BrowserRouter>
         <Routes>
@@ -26,10 +30,9 @@ export default function App() {
             <Route path="agendar" element={<BookingPage />} />
           </Route>
 
-          <Route
-            path="/admin"
-            element={<AdminLayout />}
-          >
+          <Route path="/admin/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+          <Route path="/admin" element={<AdminLayout />}>
             <Route
               index
               element={
@@ -55,6 +58,7 @@ export default function App() {
               element={<SettingsPage />}
             />
           </Route>
+          </Route>
 
           <Route
             path="*"
@@ -65,5 +69,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </SchedulingProvider>
+    </AuthProvider>
   );
 }

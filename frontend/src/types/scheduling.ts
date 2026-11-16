@@ -12,20 +12,6 @@ export type Appointment = {
   time: string;
   modality: string;
   status: AppointmentStatus;
-};
-
-export type TimeRange = {
-  start: string;
-  end: string;
-};
-
-export type DayAvailability = {
-  dayOfWeek: number;
-  enabled: boolean;
-  ranges: TimeRange[];
-};
-
-export type AvailabilitySettings = {
-  sessionDuration: number;
-  days: DayAvailability[];
+  serviceName: string;
+  startsAt: string;
 };

@@ -1921,3 +1921,40 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+.login-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--surface, #f8f5f1);
+}
+
+.login-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--border, #ded7cf);
+  border-radius: 18px;
+  background: var(--card, #fffdfa);
+}
+
+.login-card label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-left: 8px;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}

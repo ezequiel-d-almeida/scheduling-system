@@ -5,6 +5,8 @@ import com.schedulingsystem.api.entity.*;
 import com.schedulingsystem.api.exception.*;
 import com.schedulingsystem.api.repository.*;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
@@ -17,7 +19,18 @@ public class AppointmentService {
     public AppointmentService(AppointmentRepository appointments, AppointmentEventRepository events, AvailabilityWindowRepository windows, ScheduleBlockRepository blocks, ServiceService services) { this.appointments=appointments; this.events=events; this.windows=windows; this.blocks=blocks; this.services=services; }
     @Transactional(readOnly=true) public AvailabilityResponse availability(LocalDate date, Long serviceId) { var service=services.findActiveEntity(serviceId); var slots=new ArrayList<OffsetDateTime>(); for (var window : windows.findByDayOfWeekAndActiveTrue(date.getDayOfWeek().getValue()%7)) { var current=ZonedDateTime.of(date,window.getStartTime(),BUSINESS_ZONE); var limit=ZonedDateTime.of(date,window.getEndTime(),BUSINESS_ZONE); while(!current.plusMinutes(service.getDurationMinutes()).isAfter(limit)){var start=current.toOffsetDateTime();var end=current.plusMinutes(service.getDurationMinutes()).toOffsetDateTime();if(!start.isBefore(OffsetDateTime.now(BUSINESS_ZONE))&&appointments.overlaps(start,end,null).isEmpty()&&!blocks.overlaps(start,end))slots.add(start);current=current.plusMinutes(15);}} return new AvailabilityResponse(serviceId,date.toString(),slots); }
     @Transactional public AppointmentResponse create(CreateAppointmentRequest request) { var service=services.findActiveEntity(request.serviceId()); var start=request.startsAt().atZoneSameInstant(BUSINESS_ZONE).toOffsetDateTime(); var end=start.plusMinutes(service.getDurationMinutes()); validateSlot(start,end,null); try {var appointment=appointments.saveAndFlush(new Appointment(service,request.clientName().trim(),request.clientPhone().trim(),request.modality(),request.location(),start,end));events.save(new AppointmentEvent(appointment,"CREATED"));return response(appointment);} catch(DataIntegrityViolationException e){throw new ConflictException("The selected time is no longer available");} }
-    @Transactional(readOnly=true) public List<AppointmentResponse> list(LocalDate date,AppointmentStatus status){OffsetDateTime from=date==null?null:date.atStartOfDay(BUSINESS_ZONE).toOffsetDateTime();OffsetDateTime to=date==null?null:date.plusDays(1).atStartOfDay(BUSINESS_ZONE).toOffsetDateTime();return appointments.search(status,from,to).stream().map(this::response).toList();}
+    @Transactional(readOnly=true) public List<AppointmentResponse> list(LocalDate date,AppointmentStatus status){
+        OffsetDateTime from=date==null?null:date.atStartOfDay(BUSINESS_ZONE).toOffsetDateTime();
+        OffsetDateTime to=date==null?null:date.plusDays(1).atStartOfDay(BUSINESS_ZONE).toOffsetDateTime();
+        Specification<Appointment> filters=(root,query,criteria)->{
+            var predicates=new ArrayList<jakarta.persistence.criteria.Predicate>();
+            if(status!=null) predicates.add(criteria.equal(root.get("status"),status));
+            if(from!=null) predicates.add(criteria.greaterThanOrEqualTo(root.get("startsAt"),from));
+            if(to!=null) predicates.add(criteria.lessThan(root.get("startsAt"),to));
+            return criteria.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        return appointments.findAll(filters,Sort.by(Sort.Direction.ASC,"startsAt")).stream().map(this::response).toList();
+    }
     @Transactional(readOnly=true) public AppointmentResponse get(Long id){return response(entity(id));}
     @Transactional public AppointmentResponse confirm(Long id){var a=entity(id);a.confirm();events.save(new AppointmentEvent(a,"CONFIRMED"));return response(a);}
     @Transactional public AppointmentResponse cancel(Long id){var a=entity(id);a.cancel();events.save(new AppointmentEvent(a,"CANCELLED"));return response(a);}

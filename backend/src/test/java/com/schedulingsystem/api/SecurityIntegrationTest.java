@@ -1,7 +1,16 @@
 package com.schedulingsystem.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.schedulingsystem.api.dto.CreateAvailabilityWindowRequest;
+import com.schedulingsystem.api.dto.CreateServiceRequest;
 import com.schedulingsystem.api.repository.AdminAccountRepository;
+import com.schedulingsystem.api.service.ScheduleConfigurationService;
+import com.schedulingsystem.api.service.ServiceService;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -17,6 +26,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.hasItem;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -49,6 +59,8 @@ class SecurityIntegrationTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired AdminAccountRepository accounts;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired ServiceService services;
+    @Autowired ScheduleConfigurationService schedule;
 
     @Test
     void administrativeRoutesRequireAnAuthenticatedSession() throws Exception {
@@ -111,6 +123,39 @@ class SecurityIntegrationTest {
         assertNotEquals(PASSWORD, account.getPasswordHash());
         assertTrue(account.getPasswordHash().startsWith("$2"));
         assertTrue(passwordEncoder.matches(PASSWORD, account.getPasswordHash()));
+    }
+
+    @Test
+    void publicAppointmentIsPersistedAndVisibleToTheAuthenticatedAdministrator() throws Exception {
+        LocalDate date = LocalDate.now(ZoneId.of("America/Recife")).plusDays(30);
+        schedule.addWindow(new CreateAvailabilityWindowRequest(
+                date.getDayOfWeek().getValue() % 7, LocalTime.of(9, 0), LocalTime.of(17, 0)));
+        long serviceId = services.create(new CreateServiceRequest("Public flow service", 60)).id();
+        String startsAt = ZonedDateTime.of(date, LocalTime.of(10, 0), ZoneId.of("America/Recife")).toOffsetDateTime().toString();
+
+        MvcResult created = mvc.perform(post("/api/public/appointments")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "serviceId", serviceId,
+                                "clientName", "Public flow client",
+                                "clientPhone", "+5587999999999",
+                                "modality", "REMOTE",
+                                "startsAt", startsAt))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status", is("PENDING")))
+                .andReturn();
+        long appointmentId = objectMapper.readTree(created.getResponse().getContentAsByteArray()).get("id").asLong();
+
+        var login = login(csrf());
+        mvc.perform(get("/api/admin/appointments").session(login.session()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + appointmentId + ")].status", hasItem("PENDING")));
+        mvc.perform(get("/api/admin/appointments")
+                        .param("date", date.toString())
+                        .param("status", "PENDING")
+                        .session(login.session()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + appointmentId + ")].status", hasItem("PENDING")));
     }
 
     private LoginSession login(Csrf csrf) throws Exception {
